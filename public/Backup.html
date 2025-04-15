@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Dartboard AR – Blickrichtung & Platzierung</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body { margin: 0; overflow: hidden; }
+      #start-ar, #reset {
+        font-size: 18px;
+        z-index: 9999;
+      }
+      #start-ar {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 15px 30px;
+      }
+      #reset {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        padding: 10px 20px;
+        background: rgba(255, 255, 255, 0.9);
+        border: none;
+        border-radius: 8px;
+        display: none;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+  </head>
+  <body>
+    <button id="start-ar">Kamera starten (AR)</button>
+    <button id="reset">Zurücksetzen</button>
+
+    <script>
+      const startBtn = document.getElementById('start-ar');
+      const resetBtn = document.getElementById('reset');
+
+      let renderer, scene, camera;
+      let dartboard = null;
+      let placed = false;
+      let marker = null;
+
+      let hitTestSource = null;
+      let viewerSpace = null;
+      let refSpace = null;
+      let lastHitPose = null;
+
+      startBtn.addEventListener('click', async () => {
+        if (!navigator.xr) {
+          alert("WebXR nicht verfügbar.");
+          return;
+        }
+
+        const supported = await navigator.xr.isSessionSupported('immersive-ar');
+        if (!supported) {
+          alert("AR nicht unterstützt.");
+          return;
+        }
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.xr.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera();
+
+        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+        scene.add(light);
+
+        const loader = new THREE.GLTFLoader();
+        loader.load('assets/dartboard.glb', (gltf) => {
+          dartboard = gltf.scene;
+          //dartboard.scale.set(1.5, 1.5, 1.5); Modell hat bereits die richtigen Maße
+          dartboard.visible = false;
+          scene.add(dartboard);
+        });
+
+        const session = await navigator.xr.requestSession('immersive-ar', {
+          requiredFeatures: ['hit-test', 'dom-overlay'],
+          domOverlay: { root: document.body }
+        });
+
+        renderer.xr.setReferenceSpaceType('local');
+        await renderer.xr.setSession(session);
+
+        refSpace = await session.requestReferenceSpace('local');
+        viewerSpace = await session.requestReferenceSpace('viewer');
+        hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+
+        const controller = renderer.xr.getController(0);
+        controller.addEventListener('select', () => {
+          if (dartboard && lastHitPose && !placed) {
+            const hit = lastHitPose.transform.position;
+
+            // Position auf x/z vom Hit, y auf Augenhöhe
+            const xrCam = renderer.xr.getCamera(camera);
+            const realCam = xrCam.cameras?.[0] || xrCam;
+
+            const position = new THREE.Vector3(
+              hit.x,
+              realCam.position.y,
+              hit.z
+            );
+
+            // Optionaler Marker
+            marker = new THREE.Mesh(
+              new THREE.BoxGeometry(0.2, 0.2, 0.01),
+              new THREE.MeshBasicMaterial({ color: 'red' })
+            );
+            marker.position.copy(position);
+            scene.add(marker);
+
+            dartboard.visible = true;
+            dartboard.position.copy(position);
+
+            // Richtung zur Kamera + 90° aufrichten
+            dartboard.lookAt(realCam.position);
+            dartboard.rotateX(THREE.MathUtils.degToRad(90));
+
+            dartboard.updateMatrix();
+            dartboard.matrixAutoUpdate = false;
+            placed = true;
+
+            resetBtn.style.display = 'block';
+            console.log("Dartscheibe platziert bei:", position);
+          }
+        });
+
+        scene.add(controller);
+
+        renderer.setAnimationLoop((timestamp, frame) => {
+          if (frame) {
+            const referenceSpace = renderer.xr.getReferenceSpace();
+            const viewerPose = frame.getViewerPose(referenceSpace);
+
+            if (hitTestSource && viewerPose) {
+              const hitTestResults = frame.getHitTestResults(hitTestSource);
+              if (hitTestResults.length > 0) {
+                lastHitPose = hitTestResults[0].getPose(referenceSpace);
+              }
+            }
+          }
+
+          renderer.render(scene, camera);
+        });
+
+        startBtn.style.display = 'none';
+      });
+
+      resetBtn.addEventListener('click', async () => {
+        if (dartboard) {
+          dartboard.visible = false;
+          dartboard.matrixAutoUpdate = true;
+        }
+        if (marker) {
+          scene.remove(marker);
+          marker = null;
+        }
+
+        placed = false;
+        lastHitPose = null;
+
+        if (hitTestSource && viewerSpace) {
+          hitTestSource.cancel?.();
+          const session = renderer.xr.getSession();
+          hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+        }
+
+        resetBtn.style.display = 'none';
+        console.log("Dartscheibe zurückgesetzt");
+      });
+    </script>
+  </body>
+</html>

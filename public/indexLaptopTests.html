@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <title>3D Dartscheibe – mit Score & Miss-Erkennung</title>
+
+    <!-- A-Frame & Scripte -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="./js/hitDetection.js"></script>
+    <script src="./js/throwTest.js"></script>
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+
+  <body>
+    <!-- 🎯 Button -->
+    <div id="throwButton">🎯 Pfeil werfen</div>
+
+    <!-- A-Frame Szene -->
+    <a-scene>
+      <!-- 🔄 Frei bewegliche Kamera -->
+      <a-camera position="0 1.6 0" wasd-controls look-controls></a-camera>
+
+      <!-- Assets -->
+      <a-assets>
+        <a-asset-item id="dartboardModel" src="./assets/dartboard.glb"></a-asset-item>
+        <a-asset-item id="dartModel" src="./assets/Dartpfeil2.glb"></a-asset-item>
+      </a-assets>
+
+      <!-- Dartscheibe -->
+      <a-gltf-model
+        id="dartboard"
+        src="#dartboardModel"
+        position="0 1.6 -1"
+        rotation="90 0 0"
+        scale="1 1 1"
+      ></a-gltf-model>
+
+      <!-- Letzter Treffer -->
+      <a-text
+        id="scoreText"
+        value=""
+        position="0 2.5 -3"
+        align="center"
+        color="black"
+        visible="false"
+        width="6"
+      ></a-text>
+
+      <!-- Gesamtscore -->
+      <a-text
+        id="totalScoreText"
+        value="Gesamt: 0"
+        position="0 3.0 -3"
+        align="center"
+        color="black"
+        visible="true"
+        width="6"
+      ></a-text>
+    </a-scene>
+  </body>
+</html>
