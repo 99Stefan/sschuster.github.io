@@ -1,0 +1,7 @@
+vl_unterlagen/
+.idea/
+node_modules/
+package-lock.json
+package.json
+__pychache__
+.pyc
